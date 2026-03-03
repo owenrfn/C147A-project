@@ -121,6 +121,45 @@ class RandomBandRotation:
 
 
 @dataclass
+class ChannelDropout:
+    """Randomly masks electrode channels to zero.
+
+    The same channel mask is applied across all non-channel dimensions
+    (for example, all timesteps), and at least one channel is always kept.
+
+    Args:
+        dropout_prob (float): Probability of dropping each channel.
+            Must be in [0, 1]. (default: 0.1)
+        channel_dim (int): The electrode channel dimension. (default: -1)
+        mask_value (float): Value to assign to dropped channels. (default: 0.0)
+    """
+
+    dropout_prob: float = 0.1
+    channel_dim: int = -1
+    mask_value: float = 0.0
+
+    def __post_init__(self) -> None:
+        assert 0.0 <= self.dropout_prob <= 1.0
+
+    def __call__(self, tensor: torch.Tensor) -> torch.Tensor:
+        if self.dropout_prob == 0.0:
+            return tensor
+
+        channel_dim = self.channel_dim % tensor.ndim
+        num_channels = tensor.shape[channel_dim]
+        keep_mask = torch.rand(num_channels, device=tensor.device) >= self.dropout_prob
+        if not torch.any(keep_mask):
+            keep_mask[torch.randint(num_channels, (1,), device=tensor.device)] = True
+
+        keep_mask = keep_mask.to(dtype=tensor.dtype)
+        broadcast_shape = [1] * tensor.ndim
+        broadcast_shape[channel_dim] = num_channels
+        keep_mask = keep_mask.reshape(broadcast_shape)
+
+        return tensor * keep_mask + self.mask_value * (1.0 - keep_mask)
+
+
+@dataclass
 class TemporalAlignmentJitter:
     """Applies a temporal jittering augmentation that randomly jitters the
     alignment of left and right EMG data by up to ``max_offset`` timesteps.
