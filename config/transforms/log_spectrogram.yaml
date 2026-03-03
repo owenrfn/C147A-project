@@ -3,6 +3,15 @@ to_tensor:
   _target_: emg2qwerty.transforms.ToTensor
   fields: [emg_left, emg_right]
 
+gaussian_noise:
+  _target_: emg2qwerty.transforms.GaussianNoise
+  MIN_STD: 1e-5
+  std: 0.02
+  relative: true
+  prob: 1.0
+  fields: [emg_left, emg_right]
+  clamp: null
+
 band_rotation:
   _target_: emg2qwerty.transforms.ForEach  # i.i.d rotation offset for each band
   transform:
@@ -28,6 +37,7 @@ specaug:
 transforms:
   train:
     - ${to_tensor}
+    - ${gaussian_noise}
     - ${band_rotation}
     - ${temporal_jitter}
     - ${logspec}
