@@ -43,6 +43,25 @@ class ToTensor:
 
 
 @dataclass
+class NormalizePerChannel:
+    """
+    Z-score normalizes each electrode channel of the raw EMG signal over the time dimension.
+    """
+    eps: float = 1e-6
+
+    def __call__(self, tensor: torch.Tensor) -> torch.Tensor:
+        # The ToTensor transform outputs shape: (Time, Bands, Channels) e.g., (T, 2, 16)
+        # We calculate the mean and standard deviation along the Time dimension (dim=0)
+        mean = tensor.mean(dim=0, keepdim=True)
+        std = tensor.std(dim=0, keepdim=True)
+        
+        # Standardize the tensor
+        normalized_tensor = (tensor - mean) / (std + self.eps)
+        
+        return normalized_tensor
+
+
+@dataclass
 class GaussianNoise:
     """Adds Gaussian noise to specified EMG waveform fields in a sample. 
     Assumes each specified field contains a tensor representing
@@ -74,10 +93,9 @@ class GaussianNoise:
 
     std: float = 0.02 # Std of the noise
     MIN_STD: float = 1e-5 # Minimum std to prevent zero noise when relative is true
-    relative: bool = True # Relative flag true: std of the noise is relative to std of data
+    relative: bool = False # Relative flag true: std of the noise is relative to std of data
     prob: float = 1.0 # Probability of applying noise to the sample
     fields: Sequence[str] = ("emg_left", "emg_right") 
-    clamp: tuple[float, float] | None = None # Optional clamp range for the sample after adding noise)
 
     def __call__(self, sample: torch.Tensor) -> torch.Tensor:
         if self.std <= 0:

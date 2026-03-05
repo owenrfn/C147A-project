@@ -4,6 +4,7 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
+import json
 import logging
 import os
 import pprint
@@ -15,7 +16,6 @@ import hydra
 import pytorch_lightning as pl
 from hydra.utils import get_original_cwd, instantiate
 from omegaconf import DictConfig, ListConfig, OmegaConf
-
 from emg2qwerty import transforms, utils
 from emg2qwerty.transforms import Transform
 
@@ -123,6 +123,17 @@ def main(config: DictConfig):
     }
     pprint.pprint(results, sort_dicts=False)
 
+    out = {
+        "config": OmegaConf.to_container(config, resolve=True),
+        "val_metrics": val_metrics,
+        "test_metrics": test_metrics,
+        "best_checkpoint": trainer.checkpoint_callback.best_model_path,
+    }
+
+    out_path = Path.cwd() / "results.json"
+    with out_path.open("w", encoding="utf-8") as f:
+        json.dump(out, f, indent=2)
+        
 
 if __name__ == "__main__":
     OmegaConf.register_new_resolver("cpus_per_task", utils.cpus_per_task)
