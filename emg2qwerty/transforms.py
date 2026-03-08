@@ -72,30 +72,18 @@ class GaussianNoise:
 
         noisy_data = data + ε,  where  ε ~ N(0, σ²)
 
-    If relative is True, the noise standard deviation σ is computed as
-    std * data.std() per sample/field. Otherwise, σ is equal to std.
-
     Args:
         std (float): Base noise scale controlling the standard deviation of
             the Gaussian noise.
-        MIN_STD (float): Minimum signal std used when
-            relative is True to prevent vanishing noise in low-variance
+
             segments. (default: 1e-5)
-        relative (bool): If True, scales the noise level proportionally to
-            the signal standard deviation. (default: True)
         prob (float): Probability of applying noise to a given sample.
             (default: 1.0)
-        fields (Sequence[str]): Keys in the sample dictionary whose values
-            will be corrupted with noise. (default: ("emg_left", "emg_right"))
-        clamp (Optional[Tuple[float, float]]): Optional (min, max) range to
-            clamp the tensor values after noise injection. (default: None)
     """
 
     std: float = 0.02 # Std of the noise
     MIN_STD: float = 1e-5 # Minimum std to prevent zero noise when relative is true
-    relative: bool = False # Relative flag true: std of the noise is relative to std of data
     prob: float = 1.0 # Probability of applying noise to the sample
-    fields: Sequence[str] = ("emg_left", "emg_right") 
 
     def __call__(self, sample: torch.Tensor) -> torch.Tensor:
         if self.std <= 0:
@@ -107,21 +95,11 @@ class GaussianNoise:
 
         sample = sample.to(dtype=torch.float32)
 
-        if self.relative:
-            # Std of the noise is scaled by the std of the sample
-            sigma = self.std * sample.std().clamp_min(self.MIN_STD)
-        else:
-            # Std of the noise is fixed
-            sigma = torch.tensor(self.std, dtype=sample.dtype, device=sample.device)
+        sigma = torch.tensor(self.std, dtype=sample.dtype, device=sample.device)
 
         # Generate Gaussian noise and its injection
         noise = torch.randn_like(sample) * sigma
         sample = sample + noise
-
-        # Optional: clamp data to a specified range
-        if self.clamp is not None:
-            low, high = self.clamp
-            sample = sample.clamp(low, high)
 
         return sample
 
