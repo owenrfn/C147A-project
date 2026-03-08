@@ -89,8 +89,9 @@
         "emg_right"
       ]
     },
-    "normalize_per_channel": {
-      "_target_": "emg2qwerty.transforms.NormalizePerChannel"
+    "per_channel_norm": {
+      "_target_": "emg2qwerty.transforms.NormalizePerChannel",
+      "eps": 1e-06
     },
     "gaussian_noise": {
       "_target_": "emg2qwerty.transforms.GaussianNoise",
@@ -112,12 +113,15 @@
       "_target_": "emg2qwerty.transforms.TemporalAlignmentJitter",
       "max_offset": 120
     },
-    "channel_dropout": {
-      "_target_": "emg2qwerty.transforms.ForEach",
-      "transform": {
-        "_target_": "emg2qwerty.transforms.ChannelDropout",
-        "dropout_prob": 0.06
-      }
+    "amplitude_scale": {
+      "_target_": "emg2qwerty.transforms.AmplitudeScale",
+      "min_scale": 0.6,
+      "max_scale": 1.4
+    },
+    "crosstalk": {
+      "_target_": "emg2qwerty.transforms.CrosstalkSimulation",
+      "p": 0.5,
+      "max_alpha": 0.25
     },
     "logspec": {
       "_target_": "emg2qwerty.transforms.LogSpectrogram",
@@ -141,7 +145,8 @@
           ]
         },
         {
-          "_target_": "emg2qwerty.transforms.NormalizePerChannel"
+          "_target_": "emg2qwerty.transforms.NormalizePerChannel",
+          "eps": 1e-06
         },
         {
           "_target_": "emg2qwerty.transforms.GaussianNoise",
@@ -162,13 +167,6 @@
         {
           "_target_": "emg2qwerty.transforms.TemporalAlignmentJitter",
           "max_offset": 120
-        },
-        {
-          "_target_": "emg2qwerty.transforms.ForEach",
-          "transform": {
-            "_target_": "emg2qwerty.transforms.ChannelDropout",
-            "dropout_prob": 0.06
-          }
         },
         {
           "_target_": "emg2qwerty.transforms.LogSpectrogram",
@@ -192,7 +190,8 @@
           ]
         },
         {
-          "_target_": "emg2qwerty.transforms.NormalizePerChannel"
+          "_target_": "emg2qwerty.transforms.NormalizePerChannel",
+          "eps": 1e-06
         },
         {
           "_target_": "emg2qwerty.transforms.LogSpectrogram",
@@ -209,7 +208,8 @@
           ]
         },
         {
-          "_target_": "emg2qwerty.transforms.NormalizePerChannel"
+          "_target_": "emg2qwerty.transforms.NormalizePerChannel",
+          "eps": 1e-06
         },
         {
           "_target_": "emg2qwerty.transforms.LogSpectrogram",
@@ -235,8 +235,9 @@
       ]
     },
     "optimizer": {
-      "_target_": "torch.optim.Adam",
-      "lr": 0.001
+      "_target_": "torch.optim.AdamW",
+      "lr": 0.0003,
+      "weight_decay": 0.01
     },
     "lr_scheduler": {
       "scheduler": {
@@ -263,7 +264,7 @@
       "devices": 1,
       "num_nodes": 1,
       "max_epochs": 150,
-      "default_root_dir": "C:\\Users\\Owenr\\Downloads\\C147A-project\\emg2qwerty\\logs\\2026-03-07\\15-20-33"
+      "default_root_dir": "C:\\Users\\Owenr\\Downloads\\C147A-project\\emg2qwerty\\logs\\2026-03-07\\22-03-12"
     },
     "callbacks": [
       {
@@ -271,7 +272,7 @@
       },
       {
         "_target_": "pytorch_lightning.callbacks.ModelCheckpoint",
-        "dirpath": "C:\\Users\\Owenr\\Downloads\\C147A-project\\emg2qwerty\\logs\\2026-03-07\\15-20-33/checkpoints",
+        "dirpath": "C:\\Users\\Owenr\\Downloads\\C147A-project\\emg2qwerty\\logs\\2026-03-07\\22-03-12/checkpoints",
         "monitor": "val/CER",
         "mode": "min",
         "save_last": true,
@@ -281,21 +282,13 @@
   },
   "val_metrics": [
     {
-      "val/loss": 0.6129270792007446,
-      "val/CER": 18.01063346862793,
-      "val/IER": 4.386353492736816,
-      "val/DER": 1.6614975929260254,
-      "val/SER": 11.962782859802246
+      "val/loss": 83.02508544921875,
+      "val/CER": 100.0,
+      "val/IER": 100.0,
+      "val/DER": 0.0,
+      "val/SER": 0.0
     }
   ],
-  "test_metrics": [
-    {
-      "test/loss": 0.6769595146179199,
-      "test/CER": 19.364599227905273,
-      "test/IER": 6.548519611358643,
-      "test/DER": 0.5619191527366638,
-      "test/SER": 12.254159927368164
-    }
-  ],
-  "best_checkpoint": "C:\\Users\\Owenr\\Downloads\\C147A-project\\emg2qwerty\\logs\\2026-03-07\\15-20-33/checkpoints\\epoch=140-step=16920.ckpt"
+  "test_metrics": null,
+  "best_checkpoint": "C:\\Users\\Owenr\\Downloads\\C147A-project\\emg2qwerty\\logs\\2026-03-07\\22-03-12/checkpoints\\epoch=0-step=120.ckpt"
 }

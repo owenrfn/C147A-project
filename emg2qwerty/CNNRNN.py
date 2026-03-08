@@ -27,6 +27,24 @@ class SpectrogramToImage(nn.Module):
         sample = sample.permute(1, 2, 3, 4, 0).contiguous()
         sample = sample.flatten(start_dim=1, end_dim=2)
         return sample
+
+
+class ResidualBlock(nn.Module):
+    def __init__(self, channels: int):
+        super().__init__()
+
+        self.block = nn.Sequential(
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(channels),
+            nn.ReLU(inplace=True),
+
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(channels),
+        )
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, sample: torch.Tensor) -> torch.Tensor:
+        return self.relu(sample + self.block(sample))
     
 
 class CNNRNNEncoder(nn.Module):
@@ -46,19 +64,15 @@ class CNNRNNEncoder(nn.Module):
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
 
+            ResidualBlock(64),
+
             nn.Conv2d(64, 128, kernel_size=(3, 3), padding=(1, 1)),
             nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
 
             nn.MaxPool2d(kernel_size=(2, 1)),
 
-            nn.Conv2d(128, 128, kernel_size=(3, 3), padding=(1, 1)),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
-
-            nn.Conv2d(128, 128, kernel_size=(3, 3), padding=(1, 1)),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
+            ResidualBlock(128)
         )
 
         self.pre_rnn = nn.Linear(cnn_output_size, proj_dim)

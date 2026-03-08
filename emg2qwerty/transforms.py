@@ -82,7 +82,6 @@ class GaussianNoise:
     """
 
     std: float = 0.02 # Std of the noise
-    MIN_STD: float = 1e-5 # Minimum std to prevent zero noise when relative is true
     prob: float = 1.0 # Probability of applying noise to the sample
 
     def __call__(self, sample: torch.Tensor) -> torch.Tensor:
