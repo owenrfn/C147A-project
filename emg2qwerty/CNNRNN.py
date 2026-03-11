@@ -29,23 +29,29 @@ class SpectrogramToImage(nn.Module):
         return sample
 
 
-class ResidualBlock(nn.Module):
+class Refinement(nn.Module):
     def __init__(self, channels: int):
         super().__init__()
-
-        self.block = nn.Sequential(
-            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(channels),
+        self.net = nn.Sequential(
+            nn.Conv1d(channels, channels, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
-
-            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(channels),
+            nn.Conv1d(channels, channels, kernel_size=3, padding=1),
         )
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, sample: torch.Tensor) -> torch.Tensor:
-        return self.relu(sample + self.block(sample))
-    
+        # input: (T, N, C)
+
+        residual = sample
+        sample = sample.permute(1, 2, 0).contiguous()
+        # (N, C, T)
+
+        sample = self.net(sample)
+        sample = sample.permute(2, 0, 1).contiguous()
+        # (T, N, C)
+
+        return self.relu(sample + residual)
+
 
 class CNNRNNEncoder(nn.Module):
     def __init__(
@@ -64,15 +70,19 @@ class CNNRNNEncoder(nn.Module):
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
 
-            ResidualBlock(64),
-
             nn.Conv2d(64, 128, kernel_size=(3, 3), padding=(1, 1)),
             nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
 
             nn.MaxPool2d(kernel_size=(2, 1)),
 
-            ResidualBlock(128)
+            nn.Conv2d(128, 128, kernel_size=(3, 3), padding=(1, 1)),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+
+            nn.Conv2d(128, 128, kernel_size=(3, 3), padding=(1, 1)),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
         )
 
         self.pre_rnn = nn.Linear(cnn_output_size, proj_dim)
@@ -132,6 +142,8 @@ class CNNRNN(pl.LightningModule):
             rnn_dropout = rnn_dropout,
         )
 
+        self.refine = Refinement(self.encoder.out_features)
+
         self.classifier = nn.Sequential(
             nn.Linear(self.encoder.out_features, charset().num_classes),
             nn.LogSoftmax(dim=-1),
@@ -157,6 +169,9 @@ class CNNRNN(pl.LightningModule):
 
         out = self.encoder(out)
         # (T, N, 2 * hidden_size)
+
+        out = self.refine(out)
+        # (T, N, 2*hidden)
 
         out = self.classifier(out)
         # (T, N, num_classes)

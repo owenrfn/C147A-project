@@ -4,8 +4,8 @@ module:
   proj_dim: 512
   cnn_output_size: 2048
   rnn_hidden_size: 256
-  rnn_layers: 2
-  rnn_dropout: 0.1
+  rnn_layers: 3
+  rnn_dropout: 0.2
 
 datamodule:
   _target_: emg2qwerty.lightning.WindowedEMGDataModule

@@ -12,6 +12,12 @@ gaussian_noise:
   std: 0.02
   prob: 0.5
 
+channel_dropout:
+  _target_: emg2qwerty.transforms.ForEach
+  transform:
+    _target_: emg2qwerty.transforms.ChannelDropout
+    dropout_prob: 0.06
+
 band_rotation:
   _target_: emg2qwerty.transforms.ForEach  # i.i.d rotation offset for each band
   transform:
@@ -30,7 +36,7 @@ amplitude_scale:
 crosstalk:
   _target_: emg2qwerty.transforms.CrosstalkSimulation
   p: 0.5
-  max_alpha: 0.25
+  max_alpha: 0.1
 
 logspec:
   _target_: emg2qwerty.transforms.LogSpectrogram
@@ -48,7 +54,7 @@ transforms:
   train:
     - ${to_tensor}
     - ${per_channel_norm}
-    # - ${amplitude_scale}
+    - ${amplitude_scale}
     # - ${crosstalk}
     - ${gaussian_noise}
     - ${band_rotation}
