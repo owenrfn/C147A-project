@@ -438,10 +438,6 @@ class CNNModule(pl.LightningModule):
         )
 
 
-# Backward-compatibility alias for old config/checkpoint target names.
-CNNCTCModule = CNNModule
-
-
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
         super().__init__()

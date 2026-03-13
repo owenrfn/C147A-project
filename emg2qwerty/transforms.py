@@ -72,28 +72,16 @@ class GaussianNoise:
 
         noisy_data = data + ε,  where  ε ~ N(0, σ²)
 
-    If relative is True, the noise standard deviation σ is computed as
-    std * data.std() per sample/field. Otherwise, σ is equal to std.
-
     Args:
         std (float): Base noise scale controlling the standard deviation of
             the Gaussian noise.
-        MIN_STD (float): Minimum signal std used when
-            relative is True to prevent vanishing noise in low-variance
+
             segments. (default: 1e-5)
-        relative (bool): If True, scales the noise level proportionally to
-            the signal standard deviation. (default: True)
         prob (float): Probability of applying noise to a given sample.
             (default: 1.0)
-        fields (Sequence[str]): Keys in the sample dictionary whose values
-            will be corrupted with noise. (default: ("emg_left", "emg_right"))
-        clamp (Optional[Tuple[float, float]]): Optional (min, max) range to
-            clamp the tensor values after noise injection. (default: None)
     """
 
     std: float = 0.02 # Std of the noise
-    MIN_STD: float = 1e-5 # Minimum std to prevent zero noise when relative is true
-    relative: bool = False # Relative flag true: std of the noise is relative to std of data
     prob: float = 1.0 # Probability of applying noise to the sample
     fields: Sequence[str] = ("emg_left", "emg_right") 
     clamp: tuple[float, float] | None = None
@@ -108,21 +96,11 @@ class GaussianNoise:
 
         sample = sample.to(dtype=torch.float32)
 
-        if self.relative:
-            # Std of the noise is scaled by the std of the sample
-            sigma = self.std * sample.std().clamp_min(self.MIN_STD)
-        else:
-            # Std of the noise is fixed
-            sigma = torch.tensor(self.std, dtype=sample.dtype, device=sample.device)
+        sigma = torch.tensor(self.std, dtype=sample.dtype, device=sample.device)
 
         # Generate Gaussian noise and its injection
         noise = torch.randn_like(sample) * sigma
         sample = sample + noise
-
-        # Optional: clamp data to a specified range
-        if self.clamp is not None:
-            low, high = self.clamp
-            sample = sample.clamp(low, high)
 
         return sample
 
@@ -367,3 +345,38 @@ class SpecAugment:
 
         # (..., C, freq, T) -> (T, ..., C, freq)
         return x.movedim(-1, 0)
+
+
+@dataclass
+class AmplitudeScale:
+    """
+    Randomly scales the amplitude of the signal. 
+    Simulates varying electrode to skin impedance, pressure shifts, and sweat.
+    """
+    min_scale: float = 0.5
+    max_scale: float = 1.5
+    
+    def __call__(self, tensor: torch.Tensor) -> torch.Tensor:
+        # Generate random scale for each electrode channel independently
+        # tensor shape is (T, bands, channels)
+        scales = torch.empty(1, tensor.shape[1], tensor.shape[2], device=tensor.device).uniform_(self.min_scale, self.max_scale)
+        return tensor * scales
+
+
+@dataclass
+class CrosstalkSimulation:
+    """
+    Randomly blends adjacent electrode channels.
+    Simulates signal crosstalk due to closely grouped muscles and physical band shifting.
+    """
+    p: float = 0.5
+    max_alpha: float = 0.3
+    
+    def __call__(self, tensor: torch.Tensor) -> torch.Tensor:
+        if torch.rand(1).item() > self.p:
+            return tensor
+        # Shift channels over by 1 and blend
+        # Since the 16 electrodes form a circular band around the wrist, rolling the tensor mimics spatial adjacency perfectly.
+        shifted = tensor.roll(1, dims=2)
+        alpha = torch.empty(1).uniform_(0.0, self.max_alpha).item()
+        return (1 - alpha) * tensor + alpha * shifted

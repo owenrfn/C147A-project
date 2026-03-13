@@ -3,6 +3,21 @@ to_tensor:
   _target_: emg2qwerty.transforms.ToTensor
   fields: [emg_left, emg_right]
 
+per_channel_norm:
+  _target_: emg2qwerty.transforms.NormalizePerChannel
+  eps: 1e-6
+
+gaussian_noise:
+  _target_: emg2qwerty.transforms.GaussianNoise
+  std: 0.02
+  prob: 0.5
+
+channel_dropout:
+  _target_: emg2qwerty.transforms.ForEach
+  transform:
+    _target_: emg2qwerty.transforms.ChannelDropout
+    dropout_prob: 0.06
+
 band_rotation:
   _target_: emg2qwerty.transforms.ForEach  # i.i.d rotation offset for each band
   transform:
@@ -12,6 +27,16 @@ band_rotation:
 temporal_jitter:
   _target_: emg2qwerty.transforms.TemporalAlignmentJitter
   max_offset: 120  # Max 60ms jitter for 2kHz EMG
+
+amplitude_scale:
+  _target_: emg2qwerty.transforms.AmplitudeScale
+  min_scale: 0.6
+  max_scale: 1.4
+
+crosstalk:
+  _target_: emg2qwerty.transforms.CrosstalkSimulation
+  p: 0.5
+  max_alpha: 0.1
 
 logspec:
   _target_: emg2qwerty.transforms.LogSpectrogram
@@ -28,6 +53,10 @@ specaug:
 transforms:
   train:
     - ${to_tensor}
+    - ${per_channel_norm}
+    - ${amplitude_scale}
+    # - ${crosstalk}
+    - ${gaussian_noise}
     - ${band_rotation}
     - ${temporal_jitter}
     - ${logspec}
@@ -35,6 +64,7 @@ transforms:
 
   val:
     - ${to_tensor}
+    - ${per_channel_norm}
     - ${logspec}
 
   test: ${transforms.val}
