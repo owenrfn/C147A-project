@@ -96,6 +96,7 @@ class GaussianNoise:
     relative: bool = False # Relative flag true: std of the noise is relative to std of data
     prob: float = 1.0 # Probability of applying noise to the sample
     fields: Sequence[str] = ("emg_left", "emg_right") 
+    clamp: tuple[float, float] | None = None
 
     def __call__(self, sample: torch.Tensor) -> torch.Tensor:
         if self.std <= 0:

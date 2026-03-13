@@ -278,3 +278,95 @@ class TDSConvEncoder(nn.Module):
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         return self.tds_conv_blocks(inputs)  # (T, N, num_features)
+
+
+class CNNConv1dBlock(nn.Module):
+    """A residual depthwise-separable Conv1d block for TNC inputs."""
+
+    def __init__(
+        self,
+        num_features: int,
+        hidden_features: int,
+        kernel_width: int,
+        dropout: float,
+    ) -> None:
+        super().__init__()
+        assert kernel_width % 2 == 1, "kernel_width must be odd for same padding"
+        assert hidden_features > 0
+
+        self.depthwise = nn.Conv1d(
+            in_channels=num_features,
+            out_channels=num_features,
+            kernel_size=kernel_width,
+            padding=kernel_width // 2,
+            groups=num_features,
+        )
+        self.pointwise_in = nn.Conv1d(
+            in_channels=num_features,
+            out_channels=hidden_features,
+            kernel_size=1,
+        )
+        self.pointwise_out = nn.Conv1d(
+            in_channels=hidden_features,
+            out_channels=num_features,
+            kernel_size=1,
+        )
+        self.activation = nn.SiLU()
+        self.dropout = nn.Dropout(dropout)
+        self.layer_norm = nn.LayerNorm(num_features)
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        # TNC -> NCT for Conv1d
+        x = inputs.movedim(0, -1)
+        x = self.depthwise(x)
+        x = self.pointwise_in(x)
+        x = self.activation(x)
+        x = self.dropout(x)
+        x = self.pointwise_out(x)
+        x = self.dropout(x)
+        # NCT -> TNC
+        x = x.movedim(-1, 0)
+        x = x + inputs
+        return self.layer_norm(x)
+
+
+class CNNEncoder(nn.Module):
+    """A CNN encoder on TNC inputs with feature bottleneck."""
+
+    def __init__(
+        self,
+        num_features: int,
+        model_features: int | None = None,
+        num_blocks: int = 5,
+        kernel_width: int = 9,
+        dropout: float = 0.1,
+        expansion_factor: int = 2,
+    ) -> None:
+        super().__init__()
+        assert num_blocks > 0
+        if model_features is None:
+            model_features = num_features
+        assert model_features > 0
+        assert expansion_factor >= 1
+
+        self.input_projection = (
+            nn.Linear(num_features, model_features)
+            if model_features != num_features
+            else nn.Identity()
+        )
+        hidden_features = model_features * expansion_factor
+        self.blocks = nn.Sequential(
+            *[
+                CNNConv1dBlock(
+                    num_features=model_features,
+                    hidden_features=hidden_features,
+                    kernel_width=kernel_width,
+                    dropout=dropout,
+                )
+                for _ in range(num_blocks)
+            ]
+        )
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        x = self.input_projection(inputs)
+        return self.blocks(x)  # (T, N, model_features)

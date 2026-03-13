@@ -1,0 +1,13 @@
+# @package _global_
+module:
+  # Baseline-aligned CNN stack (time-depth separable conv CTC).
+  _target_: emg2qwerty.lightning.TDSConvCTCModule
+  in_features: 528  # (n_fft // 2 + 1) * 16 channels per band
+  mlp_features: [384]
+  block_channels: [24, 24, 24, 24]
+  kernel_width: 32
+
+datamodule:
+  _target_: emg2qwerty.lightning.WindowedEMGDataModule
+  window_length: 8000  # 4 sec windows for 2kHz EMG
+  padding: [1800, 200]  # 900ms past context, 100ms future context

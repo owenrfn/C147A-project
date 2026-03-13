@@ -62,15 +62,6 @@ def main(config: DictConfig):
         decoder=config.decoder,
         _recursive_=False,
     )
-    if config.checkpoint is not None:
-        log.info(f"Loading module from checkpoint {config.checkpoint}")
-        module = module.load_from_checkpoint(
-            config.checkpoint,
-            optimizer=config.optimizer,
-            lr_scheduler=config.lr_scheduler,
-            decoder=config.decoder,
-        )
-
     # Instantiate LightningDataModule
     log.info(f"Instantiating LightningDataModule {config.datamodule}")
     datamodule = instantiate(
@@ -97,9 +88,12 @@ def main(config: DictConfig):
     )
 
     if config.train:
-        # Check if a past checkpoint exists to resume training from
-        checkpoint_dir = Path.cwd().joinpath("checkpoints")
-        resume_from_checkpoint = utils.get_last_checkpoint(checkpoint_dir)
+        # If explicitly provided, resume from that checkpoint.
+        resume_from_checkpoint = config.checkpoint
+        if resume_from_checkpoint is None:
+            # Otherwise check if a past checkpoint exists in the current run dir.
+            checkpoint_dir = Path.cwd().joinpath("checkpoints")
+            resume_from_checkpoint = utils.get_last_checkpoint(checkpoint_dir)
         if resume_from_checkpoint is not None:
             log.info(f"Resuming training from checkpoint {resume_from_checkpoint}")
 
@@ -111,8 +105,17 @@ def main(config: DictConfig):
             trainer.checkpoint_callback.best_model_path
         )
 
-    # Validate and test on the best checkpoint (if training), or on the
-    # loaded `config.checkpoint` (otherwise)
+    # Validate and test on the best checkpoint (if training), or on
+    # `config.checkpoint` (otherwise, if provided).
+    elif config.checkpoint is not None:
+        log.info(f"Loading module from checkpoint {config.checkpoint}")
+        module = module.load_from_checkpoint(
+            config.checkpoint,
+            optimizer=config.optimizer,
+            lr_scheduler=config.lr_scheduler,
+            decoder=config.decoder,
+        )
+
     val_metrics = trainer.validate(module, datamodule)
     test_metrics = trainer.test(module, datamodule)
 
